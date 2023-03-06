@@ -4,12 +4,62 @@ import random
 
 import pygame
 from pygame import *
-import pygame_menu
-from pygame_menu import themes
+
 
 pygame.init()
 SIZE = W, H = 1600, 900
 screen = display.set_mode(SIZE)
+
+
+def menu(status):
+    background = transform.scale(load_image('menu.png'), (W, H))
+    start_b = pygame.sprite.Sprite()
+    start_b.image = load_image('buttons/newgame.png')
+    start_b.rect = start_b.image.get_rect()
+    start_b.rect.x = W // 2 - start_b.rect.w // 2
+    start_b.rect.y = H // 2 - start_b.rect.h // 2
+    start_b.add(buttons_sprites)
+    exit_b = pygame.sprite.Sprite()
+    exit_b.image = load_image('buttons/exit.png')
+    exit_b.rect = exit_b.image.get_rect()
+    exit_b.rect.x = W // 2 - exit_b.rect.w // 2
+    exit_b.rect.y = start_b.rect.y + start_b.rect.h + 20
+    exit_b.add(buttons_sprites)
+    if status == 'pause':
+        resume_b = pygame.sprite.Sprite()
+        resume_b.image = load_image('buttons/resume.png')
+        resume_b.rect = resume_b.image.get_rect()
+        resume_b.rect.x = W // 2 - resume_b.rect.w // 2
+        resume_b.rect.y = start_b.rect.y - 20 - resume_b.rect.h
+        resume_b.add(buttons_sprites)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            if event.type == pygame.MOUSEMOTION:
+                if start_b.rect.x < event.pos[0] < start_b.rect.x + start_b.rect.w \
+                        and start_b.rect.y < event.pos[1] < start_b.rect.y + start_b.rect.h:
+                    start_b.image = load_image('buttons/newgame_c.png')
+                else:
+                    start_b.image = load_image('buttons/newgame.png')
+                if exit_b.rect.x < event.pos[0] < exit_b.rect.x + exit_b.rect.w \
+                        and exit_b.rect.y < event.pos[1] < exit_b.rect.y + exit_b.rect.h:
+                    exit_b.image = load_image('buttons/exit_c.png')
+                else:
+                    exit_b.image = load_image('buttons/exit.png')
+            if event.type == MOUSEBUTTONDOWN:
+                if start_b.rect.x < event.pos[0] < start_b.rect.x + start_b.rect.w \
+                        and start_b.rect.y < event.pos[1] < start_b.rect.y + start_b.rect.h:
+                    return
+                if exit_b.rect.x < event.pos[0] < exit_b.rect.x + exit_b.rect.w \
+                        and exit_b.rect.y < event.pos[1] < exit_b.rect.y + exit_b.rect.h:
+                    terminate()
+
+        screen.blit(background, (0, 0))
+        buttons_sprites.draw(screen)
+        display.flip()
+        clock.tick(FPS)
 
 
 def terminate():
@@ -17,17 +67,11 @@ def terminate():
     sys.exit()
 
 
-def create_menu():
-    mainmenu = pygame_menu.Menu('ИГРА', 800, 450,
-                                theme=themes.THEME_DARK)
-    mainmenu.add.button('Новая игра', start_game())
-    mainmenu.add.button('Выход', terminate())
-
-
 all_sprites = sprite.Group()
 player_sprite = sprite.Group()
 level_sprites = sprite.Group()
 background_sprites = sprite.Group()
+buttons_sprites = sprite.Group()
 clock = time.Clock()
 FPS = 15
 GRAVITY = 5
@@ -235,6 +279,7 @@ ground = Ground()
 player = Player(W // 2, 710)
 camera = Camera()
 
+menu('start')
 while True:
     for e in event.get():
         if e.type == QUIT:
@@ -256,6 +301,8 @@ while True:
                 player.jump()
             if e.key == K_f:
                 player.attack()
+            if e.key == K_ESCAPE:
+                menu('pause')
         if e.type == KEYUP:
             player.idle()
     camera.update(player)
