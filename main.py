@@ -12,6 +12,7 @@ screen = display.set_mode(SIZE)
 
 
 def menu(status):
+    menu_screen = display.set_mode(SIZE)
     background = transform.scale(load_image('menu.png'), (W, H))
     start_b = pygame.sprite.Sprite()
     start_b.image = load_image('buttons/newgame.png')
@@ -48,16 +49,26 @@ def menu(status):
                     exit_b.image = load_image('buttons/exit_c.png')
                 else:
                     exit_b.image = load_image('buttons/exit.png')
+                if status == 'pause':
+                    if resume_b.rect.x < event.pos[0] < resume_b.rect.x + resume_b.rect.w \
+                            and resume_b.rect.y < event.pos[1] < resume_b.rect.y + resume_b.rect.h:
+                        resume_b.image = load_image('buttons/resume_c.png')
+                    else:
+                        resume_b.image = load_image('buttons/resume.png')
             if event.type == MOUSEBUTTONDOWN:
                 if start_b.rect.x < event.pos[0] < start_b.rect.x + start_b.rect.w \
                         and start_b.rect.y < event.pos[1] < start_b.rect.y + start_b.rect.h:
+                    new_game()
                     return
                 if exit_b.rect.x < event.pos[0] < exit_b.rect.x + exit_b.rect.w \
                         and exit_b.rect.y < event.pos[1] < exit_b.rect.y + exit_b.rect.h:
                     terminate()
+                if resume_b.rect.x < event.pos[0] < resume_b.rect.x + resume_b.rect.w \
+                        and resume_b.rect.y < event.pos[1] < resume_b.rect.y + resume_b.rect.h:
+                    return
 
-        screen.blit(background, (0, 0))
-        buttons_sprites.draw(screen)
+        menu_screen.blit(background, (0, 0))
+        buttons_sprites.draw(menu_screen)
         display.flip()
         clock.tick(FPS)
 
@@ -72,6 +83,7 @@ player_sprite = sprite.Group()
 level_sprites = sprite.Group()
 background_sprites = sprite.Group()
 buttons_sprites = sprite.Group()
+enemies = sprite.Group()
 clock = time.Clock()
 FPS = 15
 GRAVITY = 5
@@ -91,6 +103,91 @@ def load_image(name, colorkey=None):
     else:
         image = image.convert_alpha()
     return image
+
+
+class Skeleton(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__(enemies, all_sprites)
+        self.back = False
+        self.frames = []
+        self.cur_frame = 0
+        self.image = None
+        self.change_animation('walk', x, y)
+        self.status = 'walk'
+        self.vx = 0
+        self.vy = 0
+        self.direction = 'L'
+        self.on_ground = True
+        self.mask = mask.from_surface(self.image)
+        self.spawn_point = x
+
+    def change_animation(self, animation, x, y):
+        if animation == 'walk':
+            self.frames = []
+            self.cut_sheet(load_image('skeleton/Walk.png'),
+                           4, 1, x, y)
+            self.cur_frame = 0
+            self.image = self.frames[self.cur_frame].convert_alpha()
+        elif animation == 'attack':
+            self.frames = []
+            self.cut_sheet(load_image('skeleton/Attack.png'),
+                           8, 1, x, y)
+            self.cur_frame = 0
+            self.image = self.frames[self.cur_frame].convert_alpha()
+
+    def cut_sheet(self, sheet, cols, rows, x, y):
+        self.rect = Rect(x, y, sheet.get_width() // cols,
+                         sheet.get_height() // rows)
+        for j in range(rows):
+            for i in range(cols):
+                frame_location = self.rect.w * i, self.rect.h * j
+                self.frames.append(sheet.subsurface(Rect(
+                    frame_location, self.rect.size
+                )))
+
+    def walk(self):
+        self.status = 'walk'
+        self.vx = 10
+        self.change_animation('walk', self.rect.x, self.rect.y)
+
+    def attack(self):
+        self.status = 'attack'
+        self.change_animation('attack', self.rect.x, self.rect.y)
+
+    def update(self):
+        self.cur_frame = (self.cur_frame + 1) % len(self.frames)
+        if abs(self.rect.x - player.rect.x) < 30:
+            self.attack()
+        if abs(self.rect.x - player.rect.x) < 100 and self.status != 'attack':
+            self.status = 'persuit'
+            if self.rect.x < player.rect.x:
+                self.direction = 'R'
+                self.vx = 10
+            else:
+                self.direction = 'L'
+                self.vx = -10
+        if self.rect.x > ground.rect.x + self.spawn_point + 150 and self.status == 'walk':
+            self.direction = 'L'
+        elif self.rect.x < ground.rect.x + self.spawn_point - 150 and self.status == 'walk':
+            self.direction = 'R'
+        if not pygame.sprite.collide_mask(self, ground):
+            self.on_ground = False
+        else:
+            self.on_ground = True
+        if self.direction == 'R':
+            self.image = self.frames[self.cur_frame]
+        elif self.direction == 'L':
+            self.image = transform.flip(self.frames[self.cur_frame],
+                                        True, False)
+        if self.status == 'walk' and self.direction == 'R':
+            self.vx = 10
+        elif self.status == 'walk' and self.direction == 'L':
+            self.vx = -10
+        if not self.on_ground:
+            self.vy += GRAVITY
+        else:
+            self.vy = 0
+        self.rect = self.rect.move(self.vx, self.vy)
 
 
 class Camera:
@@ -273,12 +370,23 @@ class Background(sprite.Sprite):
             self.rect = self.rect.move(0, 250)
 
 
-for i in range(1, 8):
-    Background(i)
-ground = Ground()
-player = Player(W // 2, 710)
-camera = Camera()
+ground = None
+player = None
+camera = None
+skeleton = None
 
+
+def new_game():
+    global ground, player, camera, skeleton
+    for i in range(1, 8):
+        Background(i)
+    ground = Ground()
+    skeleton = Skeleton(1200, 710)
+    player = Player(W // 2, 710)
+    camera = Camera()
+
+
+new_game()
 menu('start')
 while True:
     for e in event.get():
